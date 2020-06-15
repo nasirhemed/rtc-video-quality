@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # Copyright 2016 Google Inc. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -45,7 +45,7 @@ def find_absolute_path(use_system_path, binary):
   target = os.path.join(os.path.dirname(os.path.abspath(__file__)), binary)
   if os.path.isfile(target) and os.access(target, os.X_OK):
     if use_system_path:
-      print "WARNING: '%s' not in PATH (using --use-system-path), falling back on locally-compiled binary." % os.path.basename(binary)
+      print("WARNING: '%s' not in PATH (using --use-system-path), falling back on locally-compiled binary." % os.path.basename(binary))
     binary_absolute_paths[binary] = target
     return target
 
@@ -335,7 +335,7 @@ def prepare_clips(args, temp_dir):
   clips = args.clips
   y4m_clips = [clip for clip in clips if clip['file_type'] == 'y4m']
   if y4m_clips:
-    print "Converting %d .y4m clip%s..." % (len(y4m_clips), "" if len(y4m_clips) == 1 else "s")
+    print("Converting %d .y4m clip%s..." % (len(y4m_clips), "" if len(y4m_clips) == 1 else "s"))
     for clip in y4m_clips:
       (fd, yuv_file) = tempfile.mkstemp(dir=temp_dir, suffix=".%d_%d.yuv" % (clip['width'], clip['height']))
       os.close(fd)
@@ -384,7 +384,7 @@ def add_framestats(results_dict, framestats_file, statstype):
   with open(framestats_file) as csvfile:
     reader = csv.DictReader(csvfile)
     for row in reader:
-      for (metric, value) in row.items():
+      for (metric, value) in list(row.items()):
         metric_key = 'frame-%s' % metric
         if metric_key not in results_dict:
           results_dict[metric_key] = []
@@ -452,7 +452,8 @@ def generate_metrics(results_dict, job, temp_dir, encoded_file):
   results_dict['bitrate-utilization'] = float(bitrate_used_bps) / target_bitrate_bps
 
 
-def run_command(job, (command, encoded_files), job_temp_dir, encoded_file_dir):
+def run_command(job, xxx_todo_changeme, job_temp_dir, encoded_file_dir):
+  (command, encoded_files) = xxx_todo_changeme
   clip = job['clip']
   start_time = time.time()
   try:
@@ -579,10 +580,10 @@ def worker():
     with thread_lock:
       current_job += 1
       run_ok = results is not None
-      print "[%d/%d] %s (%s)" % (current_job, total_jobs, job_str, "OK" if run_ok else "ERROR")
+      print("[%d/%d] %s (%s)" % (current_job, total_jobs, job_str, "OK" if run_ok else "ERROR"))
       if not run_ok:
         has_errored = True
-        print error
+        print(error)
       else:
         for result in results:
           args.out.write(pp.pformat(result))
@@ -611,9 +612,9 @@ def main():
   if args.dump_commands:
     for (job, (command, encoded_files), job_temp_dir) in jobs:
       current_job += 1
-      print "[%d/%d] %s" % (current_job, total_jobs, job_to_string(job))
-      print "> %s" % " ".join(command)
-      print
+      print("[%d/%d] %s" % (current_job, total_jobs, job_to_string(job)))
+      print("> %s" % " ".join(command))
+      print()
 
     shutil.rmtree(temp_dir)
     return 0
@@ -630,7 +631,7 @@ def main():
   if args.enable_vmaf:
     find_absolute_path(False, 'vmaf/run_vmaf')
 
-  print "[0/%d] Running jobs..." % total_jobs
+  print("[0/%d] Running jobs..." % total_jobs)
 
   args.out.write('[')
 
