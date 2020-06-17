@@ -273,9 +273,9 @@ yuv_clip_pattern = re.compile(r"^(.*[\._](\d+)_(\d+).yuv):(\d+)$")
 def clip_arg(clip):
   (file_root, file_ext) = os.path.splitext(clip)
   if file_ext == '.y4m':
-    width = int(subprocess.check_output(["mediainfo", "--Inform=Video;%Width%", clip]))
-    height = int(subprocess.check_output(["mediainfo", "--Inform=Video;%Height%", clip]))
-    fps = float(subprocess.check_output(["mediainfo", "--Inform=Video;%FrameRate%", clip]))
+    width = int(subprocess.check_output(["mediainfo", "--Inform=Video;%Width%", clip], encoding='utf-8'))
+    height = int(subprocess.check_output(["mediainfo", "--Inform=Video;%Height%", clip], encoding='utf-8'))
+    fps = float(subprocess.check_output(["mediainfo", "--Inform=Video;%FrameRate%", clip], encoding='utf-8'))
     return {'input_file': clip, 'height': height, 'width': width, 'fps': fps, 'file_type': 'y4m'}
 
   # Make sure YUV files are correctly formatted + look readable before actually
@@ -343,7 +343,7 @@ def prepare_clips(args, temp_dir):
         subprocess.check_call(['ffmpeg', '-y', '-i', clip['input_file'], yuv_file], stdout=devnull, stderr=devnull)
       clip['yuv_file'] = yuv_file
   for clip in clips:
-    clip['sha1sum'] = subprocess.check_output(['sha1sum', clip['input_file']]).split(' ', 1)[0]
+    clip['sha1sum'] = subprocess.check_output(['sha1sum', clip['input_file']], encoding='utf-8').split(' ', 1)[0]
     if 'yuv_file' not in clip:
       clip['yuv_file'] = clip['input_file']
     frame_size = 6 * clip['width'] * clip['height'] / 4
@@ -399,7 +399,7 @@ def generate_metrics(results_dict, job, temp_dir, encoded_file):
   # TODO(pbos): Perform SSIM on downscaled .yuv files for spatial layers.
   (fd, metrics_framestats) = tempfile.mkstemp(dir=temp_dir, suffix=".csv")
   os.close(fd)
-  ssim_results = subprocess.check_output(['libvpx/tools/tiny_ssim', clip['yuv_file'], decoded_file, "%dx%d" % (results_dict['width'], results_dict['height']), str(temporal_skip), metrics_framestats]).splitlines()
+  ssim_results = subprocess.check_output(['libvpx/tools/tiny_ssim', clip['yuv_file'], decoded_file, "%dx%d" % (results_dict['width'], results_dict['height']), str(temporal_skip), metrics_framestats], encoding='utf-8').splitlines()
   metric_map = {
     'AvgPSNR': 'avg-psnr',
     'AvgPSNR-Y': 'avg-psnr-y',
@@ -430,8 +430,12 @@ def generate_metrics(results_dict, job, temp_dir, encoded_file):
   add_framestats(results_dict, metrics_framestats, float)
 
   if args.enable_vmaf:
-    vmaf_results = subprocess.check_output(['vmaf/run_vmaf', 'yuv420p', str(results_dict['width']), str(results_dict['height']), clip['yuv_file'], decoded_file, '--out-fmt', 'json'])
-    vmaf_obj = json.loads(vmaf_results)
+    results_file = 'sample.json'
+    vmaf_results = subprocess.check_output(['vmaf/libvmaf/build/tools/vmafossexec', 'yuv420p', str(results_dict['width']), str(results_dict['height']), clip['yuv_file'], decoded_file, 'vmaf/model/vmaf_v0.6.1.pkl','--log-fmt', 'json', '--log', results_file], encoding='utf-8')
+    # vmaf_obj = json.loads(vmaf_results)
+    with open('sample.json', 'r') as results_file:
+      vmaf_obj = json.load(results_file)
+
     results_dict['vmaf'] = float(vmaf_obj['aggregate']['VMAF_score'])
 
     results_dict['frame-vmaf'] = []
@@ -629,7 +633,7 @@ def main():
     elif codec == 'h264':
       find_absolute_path(False, 'openh264/h264dec')
   if args.enable_vmaf:
-    find_absolute_path(False, 'vmaf/run_vmaf')
+    find_absolute_path(False, 'vmaf/libvmaf/build/tools/vmafossexec')
 
   print("[0/%d] Running jobs..." % total_jobs)
 
