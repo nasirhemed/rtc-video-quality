@@ -1,6 +1,9 @@
 import os
 import subprocess
+import tempfile
 
+
+libvpx_threads = 4
 
 def rav1e_command(job, temp_dir):
     pass
