@@ -17,6 +17,7 @@ import argparse
 import ast
 from pathlib import Path
 from visual_metrics import HandleFiles
+from collections import OrderedDict
 import matplotlib.pyplot as plt
 import os
 import re
@@ -91,8 +92,13 @@ def generate_stt(data, output_dir=''):
         item = filtered_item[0]
 
         ## Filter my dictionary to contain the required key values
-        required_data = { key : "{:.2f}".format(item[key]) for key in metrics if key in item}
+        required_data = OrderedDict()
         required_data['bitrate'] = str(bitrate)
+        for key in metrics:
+          if key in item:
+            required_data[key] = "{:.2f}".format(item[key])
+        # required_data = { key : "{:.2f}".format(item[key]) for key in metrics if key in item}
+        # required_data['bitrate'] = str(bitrate)
 
         header = '\t'.join(required_data.keys()) + '\n'
         values = '\t'.join(required_data.values()) + '\n'

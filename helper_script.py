@@ -3,37 +3,47 @@ import subprocess
 import tempfile
 import time
 import global_variables
+from binary_vars import *
 import csv
 import shutil
 
+
 def find_bitrates(width, height):
-  # Do multiples of 100, because grouping based on bitrate splits in
-  # generate_graphs.py doesn't round properly.
+    """
+    Given the width and height of the video file, generate a list of bitrates
+    to use for the encoder
+    """
+    # Do multiples of 100, because grouping based on bitrate splits in
+    # generate_graphs.py doesn't round properly.
 
-  # TODO(pbos): Propagate the bitrate split in the data instead of inferring it
-  # from the job to avoid rounding errors.
+    # TODO(pbos): Propagate the bitrate split in the data instead of inferring it
+    # from the job to avoid rounding errors.
 
-  # Significantly lower than exact value, so 800p still counts as 720p for
-  # instance.
-  pixel_bound = width * height / 1.5
-  if pixel_bound <= 320 * 240:
-    return [100, 200, 400, 600, 800, 1200]
-  if pixel_bound <= 640 * 480:
-    return [200, 300, 500, 800, 1200, 2000]
-  if pixel_bound <= 1280 * 720:
-    return [400, 800, 1200, 1600, 2500, 5000]
-  if pixel_bound <= 1920 * 1080:
-    return [800, 1200, 2000, 3000, 5000, 10000]
-  return [1200, 1800, 3000, 6000, 10000, 15000]
+    # Significantly lower than exact value, so 800p still counts as 720p for
+    # instance.
+    pixel_bound = width * height / 1.5
+    if pixel_bound <= 320 * 240:
+        return [100, 200, 400, 600, 800, 1200]
+    if pixel_bound <= 640 * 480:
+        return [200, 300, 500, 800, 1200, 2000]
+    if pixel_bound <= 1280 * 720:
+        return [400, 800, 1200, 1600, 2500, 5000]
+    if pixel_bound <= 1920 * 1080:
+        return [800, 1200, 2000, 3000, 5000, 10000]
+    return [1200, 1800, 3000, 6000, 10000, 15000]
 
 
-layer_bitrates = [[1], [0.6, 1], [0.45, 0.65, 1]]
 def split_temporal_bitrates_kbps(target_bitrate_kbps, num_temporal_layers):
-  bitrates_kbps = []
-  for i in range(num_temporal_layers):
-    layer_bitrate_kbps = int(layer_bitrates[num_temporal_layers - 1][i] * target_bitrate_kbps)
-    bitrates_kbps.append(layer_bitrate_kbps)
-  return bitrates_kbps
+
+    layer_bitrates = [[1], [0.6, 1], [0.45, 0.65, 1]]
+
+    bitrates_kbps = []
+    for i in range(num_temporal_layers):
+        layer_bitrate_kbps = int(
+            layer_bitrates[num_temporal_layers - 1][i] * target_bitrate_kbps)
+        bitrates_kbps.append(layer_bitrate_kbps)
+    return bitrates_kbps
+
 
 def run_command(job, encoder_command, job_temp_dir, encoded_file_dir):
     """
@@ -166,9 +176,9 @@ def run_tiny_ssim(results_dict, job, temp_dir, encoded_file):
         os.close(fd)
         ssim_command.append(metrics_framestats)
 
-
     # Run the metrics command to generate the metrics
-    ssim_results = subprocess.check_output(ssim_command, encoding='utf-8').splitlines()
+    ssim_results = subprocess.check_output(
+        ssim_command, encoding='utf-8').splitlines()
 
     # Parse the metrics file
     metric_map = {
@@ -207,54 +217,92 @@ def run_tiny_ssim(results_dict, job, temp_dir, encoded_file):
 
 
 def add_framestats(results_dict, framestats_file, statstype):
-  with open(framestats_file) as csvfile:
-    reader = csv.DictReader(csvfile)
-    for row in reader:
-      for (metric, value) in list(row.items()):
-        metric_key = 'frame-%s' % metric
-        if metric_key not in results_dict:
-          results_dict[metric_key] = []
-        results_dict[metric_key].append(statstype(value))
+    """
+    Given the framestats csv file, add the results into the results_dictionary
+    """
+    with open(framestats_file) as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            for (metric, value) in list(row.items()):
+                metric_key = 'frame-%s' % metric
+                if metric_key not in results_dict:
+                    results_dict[metric_key] = []
+                results_dict[metric_key].append(statstype(value))
+
 
 def decode_file(job, temp_dir, encoded_file):
-  (fd, decoded_file) = tempfile.mkstemp(dir=temp_dir, suffix=".yuv")
-  os.close(fd)
-  (fd, framestats_file) = tempfile.mkstemp(dir=temp_dir, suffix=".csv")
-  os.close(fd)
-  with open(os.devnull, 'w') as devnull:
-    if job['codec'] in ['av1', 'vp8', 'vp9']:
-      decoder = 'aom/aomdec' if job['codec'] == 'av1' else 'libvpx/vpxdec'
-      subprocess.check_call([decoder, '--i420', '--codec=%s' % job['codec'], '-o', decoded_file, encoded_file, '--framestats=%s' % framestats_file], stdout=devnull, stderr=devnull)
-    elif job['codec'] == 'h264':
-      subprocess.check_call(['openh264/h264dec', encoded_file, decoded_file], stdout=devnull, stderr=devnull)
-      # TODO(pbos): Generate H264 framestats.
-      framestats_file = None
-  return (decoded_file, framestats_file)
+    """
+    Decode the encoded file and store it in a temporary directory
+    """
+    (fd, decoded_file) = tempfile.mkstemp(dir=temp_dir, suffix=".yuv")
+    os.close(fd)
+    (fd, framestats_file) = tempfile.mkstemp(dir=temp_dir, suffix=".csv")
+    os.close(fd)
+    with open(os.devnull, 'w') as devnull:
+        if job['codec'] in ['av1', 'vp8', 'vp9']:
+            decoder = AOM_DEC_BIN if job['codec'] == 'av1' else VPX_DEC_BIN
+            subprocess.check_call([decoder, '--i420', '--codec=%s' % job['codec'], '-o', decoded_file,
+                                   encoded_file, '--framestats=%s' % framestats_file], stdout=devnull, stderr=devnull)
+        elif job['codec'] == 'h264':
+            subprocess.check_call(
+                [H264_DEC_BIN, encoded_file, decoded_file], stdout=devnull, stderr=devnull)
+            # TODO(pbos): Generate H264 framestats.
+            framestats_file = None
+    return (decoded_file, framestats_file)
+
 
 def generate_metrics(results_dict, job, temp_dir, encoded_file):
     """
     Given an encoded file, decode it and generate some metrics around it.
     Currently, the rtc metrics are generated using the `libvpx/tools/tiny_ssim command`
 
+    Args:
+        results_dict: Dictionary containing the metrics results
+
+        job: {
+          'encoder': str,
+          'codec': str,
+          'clip': {
+              'file_type': str,
+              'input_file': str,
+              'height': int,
+              'width': int,
+              'fps': float,
+              'yuv_file': str,
+              'sha1sum': str,
+              'input_total_frames': float
+          },
+          'target_bitrate_kbps': List[int],
+          'num_spatial_layers': int,
+          'num_temporal_layers': int
+        }
+
+        encoded_file: {
+            'filename': str,
+            'spatial-layer': str,
+            'temporal-layer': str
+        }
+
+        temp_dir: str
     """
 
     # Decode the video to generate a yuv file
     (decoded_file, decoder_framestats) = decode_file(
         job, temp_dir, encoded_file['filename'])
-    clip=job['clip']
-    temporal_divide=2 ** (job['num_temporal_layers'] -
+    clip = job['clip']
+    temporal_divide = 2 ** (job['num_temporal_layers'] -
                             1 - encoded_file['temporal-layer'])
-    temporal_skip=temporal_divide - 1
+    temporal_skip = temporal_divide - 1
 
-    (fd, metrics_framestats)=tempfile.mkstemp(dir = temp_dir, suffix = ".csv")
+    (fd, metrics_framestats) = tempfile.mkstemp(dir=temp_dir, suffix=".csv")
     os.close(fd)
 
     # Run the metrics command to generate the metrics
-    ssim_results=subprocess.check_output(['libvpx/tools/tiny_ssim', clip['yuv_file'], decoded_file, "%dx%d" % (
-        results_dict['width'], results_dict['height']), str(temporal_skip), metrics_framestats], encoding = 'utf-8').splitlines()
+    ssim_results = subprocess.check_output(['libvpx/tools/tiny_ssim', clip['yuv_file'], decoded_file, "%dx%d" % (
+        results_dict['width'], results_dict['height']), str(temporal_skip), metrics_framestats], encoding='utf-8').splitlines()
 
     # Parse the metrics file
-    metric_map={
+    metric_map = {
         'AvgPSNR': 'avg-psnr',
         'AvgPSNR-Y': 'avg-psnr-y',
         'AvgPSNR-U': 'avg-psnr-u',
@@ -285,7 +333,6 @@ def generate_metrics(results_dict, job, temp_dir, encoded_file):
         add_framestats(results_dict, decoder_framestats, int)
     add_framestats(results_dict, metrics_framestats, float)
 
-
     # VMAF option if enabled. TODO: Remove this
     if global_variables.args.enable_vmaf:
         results_file = 'sample.json'
@@ -306,18 +353,18 @@ def generate_metrics(results_dict, job, temp_dir, encoded_file):
 
     spatial_divide = 2 ** (job['num_spatial_layers'] -
                            1 - encoded_file['spatial-layer'])
-    results_dict['layer-width']=results_dict['width'] // spatial_divide
-    results_dict['layer-height']=results_dict['height'] // spatial_divide
-
+    results_dict['layer-width'] = results_dict['width'] // spatial_divide
+    results_dict['layer-height'] = results_dict['height'] // spatial_divide
 
     # Calculate and compare target bitrate with actual bitrate used
-    target_bitrate_bps=job['target_bitrates_kbps'][encoded_file['temporal-layer']] * 1000
-    bitrate_used_bps=os.path.getsize(
+    target_bitrate_bps = job['target_bitrates_kbps'][encoded_file['temporal-layer']] * 1000
+    bitrate_used_bps = os.path.getsize(
         encoded_file['filename']) * 8 * layer_fps / layer_frames
     results_dict['target-bitrate-bps'] = target_bitrate_bps
     results_dict['actual-bitrate-bps'] = bitrate_used_bps
     results_dict['bitrate-utilization'] = float(
         bitrate_used_bps) / target_bitrate_bps
+
 
 def prepare_clips(args, temp_dir):
     """
@@ -370,4 +417,3 @@ def prepare_clips(args, temp_dir):
                         truncated_file.write(data)
                         total_filesize -= blocksize
             clip['yuv_file'] = truncated_filename
-

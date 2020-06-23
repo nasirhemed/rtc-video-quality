@@ -1,16 +1,131 @@
 import os
 import subprocess
 import tempfile
+from binary_vars import *
 
 
 libvpx_threads = 4
 
+
 def rav1e_command(job, temp_dir):
-    pass
+    """
+    Given a job config and a temporary directory prepare an aom 
+    command to encode the file and output it in the temporary directory
+    This function returns the command to run the encoder
+
+    Args:
+      job: {
+          'encoder': str,
+          'codec': str,
+          'clip': {
+              'file_type': str,
+              'input_file': str,
+              'height': int,
+              'width': int,
+              'fps': float,
+              'yuv_file': str,
+              'sha1sum': str,
+              'input_total_frames': float
+          },
+          'target_bitrate_kbps': List[int],
+          'num_spatial_layers': int,
+          'num_temporal_layers': int
+      }
+
+      temp_dir: str
+    Returns:
+        (command, encoder_files) where:
+            command: List of command with args
+            encoder_files: Dictionary containing output file path, spatial-layer
+                and temporal-layer
+    """
+    assert job['num_spatial_layers'] == 1
+    assert job['num_temporal_layers'] == 1
+    assert job['codec'] == 'av1'
+    assert job['encoder'] == 'rav1e-1pass'
+
+    (fd, encoded_filename) = tempfile.mkstemp(dir=temp_dir, suffix=".ivf")
+    os.close(fd)
+
+    clip = job['clip']
+    fps = int(clip['fps'] + 0.5)
+
+    command = [
+        RAV1E_ENC_BIN,
+        clip['input_file'],
+        '-y',
+        '-o', encoded_filename,
+        '--speed', '9',
+        '-b', str(job['target_bitrates_kbps'][0])
+    ]
+
+    encoded_files = [{'spatial-layer': 0,
+                      'temporal-layer': 0, 'filename': encoded_filename
+                      }]
+
+    return command, encoded_files
 
 
 def svt_command(job, temp_dir):
-    pass
+    """
+    Given a job config and a temporary directory prepare an aom 
+    command to encode the file and output it in the temporary directory
+    This function returns the command to run the encoder
+
+    Args:
+      job: {
+          'encoder': str,
+          'codec': str,
+          'clip': {
+              'file_type': str,
+              'input_file': str,
+              'height': int,
+              'width': int,
+              'fps': float,
+              'yuv_file': str,
+              'sha1sum': str,
+              'input_total_frames': float
+          },
+          'target_bitrate_kbps': List[int],
+          'num_spatial_layers': int,
+          'num_temporal_layers': int
+      }
+
+      temp_dir: str
+    Returns:
+        (command, encoder_files) where:
+            command: List of command with args
+            encoder_files: Dictionary containing output file path, spatial-layer
+                and temporal-layer
+    """
+    assert job['num_spatial_layers'] == 1
+    assert job['num_temporal_layers'] == 1
+    assert job['codec'] == 'av1'
+    assert job['encoder'] == 'svt-1pass'
+
+    (fd, encoded_filename) = tempfile.mkstemp(dir=temp_dir, suffix=".ivf")
+    os.close(fd)
+
+    clip = job['clip']
+    fps = int(clip['fps'] + 0.5)
+    command = [
+        SVT_ENC_BIN,
+        '--fps', str(fps),
+        '--tbr', str(job['target_bitrates_kbps'][0]),
+        '--rc', "2",
+        '-q', "20",
+        '--preset', "8",
+        '-w', str(clip['width']),
+        '-h', str(clip['height']),
+        '-i', str(clip['yuv_file']),
+        '-b', encoded_filename
+    ]
+
+    encoded_files = [{'spatial-layer': 0,
+                      'temporal-layer': 0, 'filename': encoded_filename
+                      }]
+
+    return command, encoded_files
 
 
 def aom_command(job, temp_dir):
@@ -60,12 +175,12 @@ def aom_command(job, temp_dir):
     clip = job['clip']
     fps = int(clip['fps'] + 0.5)
     command = [
-        "aom/aomenc",
+        AOM_ENC_BIN,
         "--codec=av1",
         "-p", "2",
         "--fpf=%s" % first_pass_file,
         "--good",
-        "--cpu-used=0",
+        "--cpu-used=8",
         "--target-bitrate=%d" % job['target_bitrates_kbps'][0],
         '--fps=%d/1' % fps,
         "--lag-in-frames=25",
@@ -109,7 +224,7 @@ def libvpx_tl_command(job, temp_dir):
     fps = int(clip['fps'] + 0.5)
 
     command = [
-        'libvpx/examples/vpx_temporal_svc_encoder',
+        VPX_SVC_ENC_BIN,
         clip['yuv_file'],
         outfile_prefix,
         job['codec'],
@@ -182,7 +297,7 @@ def libvpx_command(job, temp_dir):
     # respecting NTSC or other non-integer FPS formats here.
     fps = int(clip['fps'] + 0.5)
 
-    command = ['libvpx/vpxenc'] + codec_params + common_params + [
+    command = [VPX_ENC_BIN] + codec_params + common_params + [
         '--fps=%d/1' % fps,
         '--target-bitrate=%d' % job['target_bitrates_kbps'][0],
         '--width=%d' % clip['width'],
@@ -196,6 +311,37 @@ def libvpx_command(job, temp_dir):
 
 
 def openh264_command(job, temp_dir):
+    """
+    Given a job config and a temporary directory prepare an aom 
+    command to encode the file and output it in the temporary directory
+    This function returns the command to run the encoder
+
+    Args:
+      job: {
+          'encoder': str,
+          'codec': str,
+          'clip': {
+              'file_type': str,
+              'input_file': str,
+              'height': int,
+              'width': int,
+              'fps': float,
+              'yuv_file': str,
+              'sha1sum': str,
+              'input_total_frames': float
+          },
+          'target_bitrate_kbps': List[int],
+          'num_spatial_layers': int,
+          'num_temporal_layers': int
+      }
+
+      temp_dir: str
+    Returns:
+        (command, encoder_files) where:
+            command: List of command with args
+            encoder_files: Dictionary containing output file path, spatial-layer
+                and temporal-layer
+    """
     assert job['codec'] == 'h264'
     # TODO(pbos): Consider AVC support.
     assert job['num_spatial_layers'] == 1
@@ -208,7 +354,7 @@ def openh264_command(job, temp_dir):
     clip = job['clip']
 
     command = [
-        'openh264/h264enc',
+        H264_ENC_BIN,
         '-rc', 1,
         '-denois', 0,
         '-scene', 0,
@@ -232,6 +378,37 @@ def openh264_command(job, temp_dir):
 
 
 def yami_command(job, temp_dir):
+    """
+    Given a job config and a temporary directory prepare an aom 
+    command to encode the file and output it in the temporary directory
+    This function returns the command to run the encoder
+
+    Args:
+      job: {
+          'encoder': str,
+          'codec': str,
+          'clip': {
+              'file_type': str,
+              'input_file': str,
+              'height': int,
+              'width': int,
+              'fps': float,
+              'yuv_file': str,
+              'sha1sum': str,
+              'input_total_frames': float
+          },
+          'target_bitrate_kbps': List[int],
+          'num_spatial_layers': int,
+          'num_temporal_layers': int
+      }
+
+      temp_dir: str
+    Returns:
+        (command, encoder_files) where:
+            command: List of command with args
+            encoder_files: Dictionary containing output file path, spatial-layer
+                and temporal-layer
+    """
     assert job['num_spatial_layers'] == 1
     assert job['num_temporal_layers'] == 1
 
@@ -245,7 +422,7 @@ def yami_command(job, temp_dir):
     fps = int(clip['fps'] + 0.5)
 
     command = [
-        'yami/libyami/bin/yamiencode',
+        YAMI_ENC_BIN,
         '--rcmode', 'CBR',
         '--ipperiod', 1,
         '--intraperiod', 3000,

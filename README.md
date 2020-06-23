@@ -19,6 +19,9 @@ collection".
 
 ## Dependencies
 
+Install the requirements from requirements.txt by running `pip install -r requirements.txt`
+
+
 To build pinned versions of dependencies, comparison tools and libvpx run:
 
     $ ./setup.sh
@@ -83,6 +86,19 @@ To build pinned versions of OpenH264, run:
 OpenH264 is a single-pass encoder used in WebRTC both in Chrome and Firefox.
 This adds the `openh264:h264` which runs `h264enc` with settings that are
 intended to be close to WebRTC's implementation.
+
+### rav1e 
+
+To build pinned versions of rav1e, run:
+
+    $ ./setup_rav1e.sh
+
+### SVT-AV1
+
+To build pinned versions of SVT-AV1, run:
+
+    $ ./setup_svt-av1.sh
+
 
 ## Generating Data
 
