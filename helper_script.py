@@ -170,7 +170,7 @@ def run_tiny_ssim(results_dict, job, temp_dir, encoded_file):
 
     ssim_command = ['libvpx/tools/tiny_ssim', clip['yuv_file'], decoded_file, "%dx%d" % (
         results_dict['width'], results_dict['height']), str(temporal_skip)]
-    if global_variables.args.enable_frame_metrics:
+    if global_variables.args.enable_framestats:
         # TODO(pbos): Perform SSIM on downscaled .yuv files for spatial layers.
         (fd, metrics_framestats) = tempfile.mkstemp(dir=temp_dir, suffix=".csv")
         os.close(fd)
@@ -208,9 +208,10 @@ def run_tiny_ssim(results_dict, job, temp_dir, encoded_file):
             layer_frames = int(value)
             results_dict['frame-count'] = layer_frames
 
-    if decoder_framestats and global_variables.args.enable_frame_metrics:
-        add_framestats(results_dict, decoder_framestats, int)
-    add_framestats(results_dict, metrics_framestats, float)
+    if global_variables.args.enable_framestats:
+        if decoder_framestats:
+            add_framestats(results_dict, decoder_framestats, int)
+        add_framestats(results_dict, metrics_framestats, float)
 
     layer_fps = clip['fps'] / temporal_divide
     results_dict['layer-fps'] = layer_fps
@@ -329,9 +330,10 @@ def generate_metrics(results_dict, job, temp_dir, encoded_file):
             layer_frames = int(value)
             results_dict['frame-count'] = layer_frames
 
-    if decoder_framestats:
-        add_framestats(results_dict, decoder_framestats, int)
-    add_framestats(results_dict, metrics_framestats, float)
+    if global_variables.args.enable_framestats:
+        if decoder_framestats:
+            add_framestats(results_dict, decoder_framestats, int)
+        add_framestats(results_dict, metrics_framestats, float)
 
     # VMAF option if enabled. TODO: Remove this
     if global_variables.args.enable_vmaf:

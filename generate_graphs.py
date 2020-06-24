@@ -71,6 +71,7 @@ def generate_stt(data, output_dir=''):
           'glb-psnr-u',
           'glb-psnr-v',
           'encode-time-utilization',
+          'actual-encode-time'
           'vmaf'
         ]
   encoder_codecs = set([(item['encoder'], item['codec']) for item in data])
@@ -158,6 +159,7 @@ def main():
           'glb-psnr-u',
           'glb-psnr-v',
           'encode-time-utilization',
+          'actual-encode-time-ms',
           'vmaf'
         ]
         for metric in metrics:

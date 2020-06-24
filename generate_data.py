@@ -83,7 +83,7 @@ def encoder_pairs(string):
     pair_match = pair_pattern.match(pair)
     if not pair_match:
       raise argparse.ArgumentTypeError("Argument '%s' of '%s' doesn't match input format.\n" % (pair, string))
-    if not pair_match.group(1) in encoder_commands:
+    if not get_encoder_command(pair_match.group(1)):
       raise argparse.ArgumentTypeError("Unknown encoder: '%s' in pair '%s'\n" % (pair_match.group(1), pair))
     encoders.append((pair_match.group(1), pair_match.group(2)))
   return encoders
@@ -106,6 +106,7 @@ parser = argparse.ArgumentParser(description='Generate graph data for video-qual
 parser.add_argument('clips', nargs='+', metavar='clip_WIDTH_HEIGHT.yuv:FPS|clip.y4m', type=clip_arg)
 parser.add_argument('--dump-commands', action='store_true')
 parser.add_argument('--enable-vmaf', action='store_true')
+parser.add_argument('--enable-framestats', action='store_true')
 parser.add_argument('--encoded-file-dir', default=None, type=writable_dir)
 parser.add_argument('--encoders', required=True, metavar='encoder:codec,encoder:codec...', type=encoder_pairs)
 parser.add_argument('--frame-offset', default=0, type=positive_int)
@@ -133,7 +134,8 @@ def generate_jobs(args, temp_dir):
           'num_temporal_layers': args.num_temporal_layers,
         }
         job_temp_dir = tempfile.mkdtemp(dir=temp_dir)
-        (command, encoded_files) = encoder_commands[job['encoder']](job, job_temp_dir)
+        encoder_command_function = get_encoder_command(job['encoder'])
+        (command, encoded_files) = encoder_command_function(job, job_temp_dir)
         command[0] = find_absolute_path(args.use_system_path, command[0])
         jobs.append((job, (command, encoded_files), job_temp_dir))
   return jobs
