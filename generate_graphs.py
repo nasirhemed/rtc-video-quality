@@ -78,9 +78,6 @@ def generate_stt(data, output_dir=''):
   videos = set([item['input-file'] for item in data])
   
 ## For target bitrate
-#   bitrates = sorted(list(set([item['bitrate-config-kbps'][0] for item in data])))
-
-  bitrates = sorted(list(set([item['actual-bitrate-bps'] for item in data])))
 
 
   for encoder, codec in encoder_codecs:
@@ -89,6 +86,13 @@ def generate_stt(data, output_dir=''):
     for video in videos:
         ## Create a file for the metrics of this certain video
       sb = ""
+
+      encoder_metrics = list(filter(lambda item: item['encoder'] == encoder and item['codec'] == codec and item['input-file'] == video, data))
+
+      ##  For Target bitrate
+      #   bitrates = sorted(list(set([item['bitrate-config-kbps'][0] for item in encoder_metrics])))
+
+      bitrates = sorted(list(set([item['actual-bitrate-bps'] for item in encoder_metrics])))
       for bitrate in bitrates:
         ## Append this to the table
 
