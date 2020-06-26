@@ -76,8 +76,11 @@ def generate_stt(data, output_dir=''):
         ]
   encoder_codecs = set([(item['encoder'], item['codec']) for item in data])
   videos = set([item['input-file'] for item in data])
+  
+## For target bitrate
+#   bitrates = sorted(list(set([item['bitrate-config-kbps'][0] for item in data])))
 
-  bitrates = sorted(list(set([item['bitrate-config-kbps'][0] for item in data])))
+  bitrates = sorted(list(set([item['actual-bitrate-bps'] for item in data])))
 
 
   for encoder, codec in encoder_codecs:
@@ -88,7 +91,12 @@ def generate_stt(data, output_dir=''):
       sb = ""
       for bitrate in bitrates:
         ## Append this to the table
-        filtered_item = list(filter(lambda item: item['encoder'] == encoder and item['codec'] == codec and item['input-file'] == video and bitrate in item['bitrate-config-kbps'], data))
+
+        ## For target bitrate
+        # filtered_item = list(filter(lambda item: item['encoder'] == encoder and item['codec'] == codec and item['input-file'] == video and bitrate in item['bitrate-config-kbps'], data))
+        
+        
+        filtered_item = list(filter(lambda item: item['encoder'] == encoder and item['codec'] == codec and item['input-file'] == video and bitrate == item['actual-bitrate-bps'], data))
         assert len(filtered_item ) == 1
         item = filtered_item[0]
 
@@ -98,8 +106,6 @@ def generate_stt(data, output_dir=''):
         for key in metrics:
           if key in item:
             required_data[key] = "{:.2f}".format(item[key])
-        # required_data = { key : "{:.2f}".format(item[key]) for key in metrics if key in item}
-        # required_data['bitrate'] = str(bitrate)
 
         header = '\t'.join(required_data.keys()) + '\n'
         values = '\t'.join(required_data.values()) + '\n'
