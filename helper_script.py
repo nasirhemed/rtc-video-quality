@@ -379,14 +379,13 @@ def prepare_clips(args, temp_dir):
     * Store the total number of frames and the size of the file
     """
     clips = args.clips
-    # TODO: do not convert y4m if cargo encoder is being used
-    y4m_clips = [clip for clip in clips if clip['file_type'] == 'y4m']
+    non_yuv_clips = [clip for clip in clips if clip['file_type'] != '.yuv']
 
-    # Convert all y4m clips to yuv using ffmpeg
-    if y4m_clips:
-        print("Converting %d .y4m clip%s..." %
-              (len(y4m_clips), "" if len(y4m_clips) == 1 else "s"))
-        for clip in y4m_clips:
+    # Convert all non yuv clips to yuv using ffmpeg
+    if non_yuv_clips:
+        print("Converting %d clip%s to yuv..." %
+              (len(non_yuv_clips), "" if len(non_yuv_clips) == 1 else "s"))
+        for clip in non_yuv_clips:
             (fd, yuv_file) = tempfile.mkstemp(dir=temp_dir,
                                               suffix=".%d_%d.yuv" % (clip['width'], clip['height']))
             os.close(fd)
@@ -419,3 +418,12 @@ def prepare_clips(args, temp_dir):
                         truncated_file.write(data)
                         total_filesize -= blocksize
             clip['yuv_file'] = truncated_filename
+
+        (fd, y4m_file) = tempfile.mkstemp(dir=temp_dir, suffix='.y4m')
+        os.close(fd)
+
+        subprocess.check_call(
+            ['ffmpeg', '-y', '-s', '%dx%d' % (clip['width'], clip['height']), '-r', str(int(clip['fps'] + 0.5)), '-pix_fmt', 'yuv420p', '-i', clip['yuv_file'], y4m_file]
+        )
+
+        clip['y4m_file'] = y4m_file

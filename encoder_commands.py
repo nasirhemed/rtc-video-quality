@@ -30,6 +30,7 @@ def rav1e_command(job, temp_dir):
               'width': int,
               'fps': float,
               'yuv_file': str,
+              'y4m_file': str,
               'sha1sum': str,
               'input_total_frames': float
           },
@@ -60,7 +61,7 @@ def rav1e_command(job, temp_dir):
         '-y', 
         '--output', encoded_filename,
         '--bitrate', job['target_bitrates_kbps'][0],
-        clip['input_file']
+        clip['y4m_file']
     ]
     
     encoder = job['encoder']

@@ -59,11 +59,11 @@ def find_absolute_path(use_system_path, binary):
 yuv_clip_pattern = re.compile(r"^(.*[\._](\d+)_(\d+).yuv):(\d+)$")
 def clip_arg(clip):
   (file_root, file_ext) = os.path.splitext(clip)
-  if file_ext == '.y4m':
+  if file_ext != '.yuv':
     width = int(subprocess.check_output(["mediainfo", "--Inform=Video;%Width%", clip], encoding='utf-8'))
     height = int(subprocess.check_output(["mediainfo", "--Inform=Video;%Height%", clip], encoding='utf-8'))
     fps = float(subprocess.check_output(["mediainfo", "--Inform=Video;%FrameRate%", clip], encoding='utf-8'))
-    return {'input_file': clip, 'height': height, 'width': width, 'fps': fps, 'file_type': 'y4m'}
+    return {'input_file': clip, 'height': height, 'width': width, 'fps': fps, 'file_type': file_ext}
 
   # Make sure YUV files are correctly formatted + look readable before actually
   # running the script on them.
