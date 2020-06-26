@@ -33,6 +33,10 @@ def find_bitrates(width, height):
     return [1200, 1800, 3000, 6000, 10000, 15000]
 
 
+def find_qp(width, height):
+    return [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
+
+
 def split_temporal_bitrates_kbps(target_bitrate_kbps, num_temporal_layers):
 
     layer_bitrates = [[1], [0.6, 1], [0.45, 0.65, 1]]
@@ -97,7 +101,7 @@ def run_command(job, encoder_command, job_temp_dir, encoded_file_dir):
     try:
         # Run the encoder process externally
         process = subprocess.Popen(
-            command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding='utf-8')
     except OSError as e:
         return (None, "> %s\n%s" % (" ".join(command), e))
     # Wait for external process to finish
@@ -359,13 +363,21 @@ def generate_metrics(results_dict, job, temp_dir, encoded_file):
     results_dict['layer-height'] = results_dict['height'] // spatial_divide
 
     # Calculate and compare target bitrate with actual bitrate used
-    target_bitrate_bps = job['target_bitrates_kbps'][encoded_file['temporal-layer']] * 1000
+    # target_bitrate_bps = job['target_bitrates_kbps'][encoded_file['temporal-layer']] * 1000
     bitrate_used_bps = os.path.getsize(
         encoded_file['filename']) * 8 * layer_fps / layer_frames
-    results_dict['target-bitrate-bps'] = target_bitrate_bps
+    # results_dict['target-bitrate-bps'] = target_bitrate_bps
     results_dict['actual-bitrate-bps'] = bitrate_used_bps
-    results_dict['bitrate-utilization'] = float(
-        bitrate_used_bps) / target_bitrate_bps
+    # results_dict['bitrate-utilization'] = float(
+    #     bitrate_used_bps) / target_bitrate_bps
+    
+    if global_variables.args.enable_bitrate:
+        target_bitrate_bps = job['target_bitrates_kbps'][encoded_file['temporal-layer']] * 1000
+        results_dict['target-bitrate-bps'] = target_bitrate_bps
+        # results_dict['actual-bitrate-bps'] = bitrate_used_bps
+        results_dict['bitrate-utilization'] = float(
+            bitrate_used_bps) / target_bitrate_bps
+
 
 
 def prepare_clips(args, temp_dir):

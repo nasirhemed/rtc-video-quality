@@ -7,11 +7,14 @@ from binary_vars import *
 libvpx_threads = 4
 
 INTRA_IVAL_LOW_LATENCY = 60
-QP_VALUE = 30
 
 RAV1E_SPEED = 4
-SVT_SPEED = 6
-AOM_SPEED = 7
+SVT_SPEED = 2
+AOM_SPEED = 2
+
+AOM_RT_SPEED = 5
+RAV1E_RT_SPEED = 7
+SVT_RT_SPEED = 5
 
 def rav1e_command(job, temp_dir):
     """
@@ -34,7 +37,9 @@ def rav1e_command(job, temp_dir):
               'sha1sum': str,
               'input_total_frames': float
           },
+          'param': str,
           'target_bitrate_kbps': List[int],
+          'qp_value': int,
           'num_spatial_layers': int,
           'num_temporal_layers': int
       }
@@ -60,9 +65,18 @@ def rav1e_command(job, temp_dir):
     common_params = [
         '-y', 
         '--output', encoded_filename,
-        '--bitrate', job['target_bitrates_kbps'][0],
+        # '--bitrate', job['target_bitrates_kbps'][0],
         clip['y4m_file']
     ]
+
+    if job['param'] == 'bitrate':
+        param = [
+            '--bitrate', job['target_bitrates_kbps'][0]
+        ]
+    else:
+        param = [
+            '--quantizer', (job['qp_value'] * 4)
+        ]
     
     encoder = job['encoder']
 
@@ -74,19 +88,17 @@ def rav1e_command(job, temp_dir):
         ]
     elif encoder == 'rav1e-rt':
         codec_params = [
-            '--quantizer', (QP_VALUE * 4),
             '--low-latency',
-            'speed', RAV1E_SPEED,
+            '--speed', RAV1E_RT_SPEED,
             '--keyint', INTRA_IVAL_LOW_LATENCY
         ]
     elif encoder == 'rav1e-all_intra':
         codec_params = [
-            '--quantizer', (QP_VALUE * 4),
             '--speed', '4',
             '--keyint', '1'
         ]
 
-    command = [RAV1E_ENC_BIN] + codec_params + common_params
+    command = [RAV1E_ENC_BIN] + codec_params + param + common_params
 
     command = [str(flag) for flag in command]
 
@@ -117,7 +129,10 @@ def svt_command(job, temp_dir):
               'sha1sum': str,
               'input_total_frames': float
           },
+          'param': str,
           'target_bitrate_kbps': List[int],
+          'qp_value': int,
+
           'num_spatial_layers': int,
           'num_temporal_layers': int
       }
@@ -132,7 +147,7 @@ def svt_command(job, temp_dir):
     assert job['num_spatial_layers'] == 1
     assert job['num_temporal_layers'] == 1
     assert job['codec'] == 'av1'
-    assert job['encoder'] in ['svt-1pass', 'svt-rt', 'svt-fqp', 'svt-all_intra']
+    assert job['encoder'] in ['svt-1pass', 'svt-rt', 'svt-all_intra']
 
     (fd, encoded_filename) = tempfile.mkstemp(dir=temp_dir, suffix=".ivf")
     os.close(fd)
@@ -141,21 +156,30 @@ def svt_command(job, temp_dir):
     fps = int(clip['fps'] + 0.5)
 
     common_params = [
-        '-fps', fps,
-        '-tbr', job['target_bitrates_kbps'][0],
+        '--fps', fps,
         '-w', clip['width'],
         '-h', clip['height'],
         '-i', clip['yuv_file'],
         '-b', encoded_filename
     ]
 
+    if job['param'] == 'bitrate':
+        param = [
+            'tbr', job['target_bitrates_kbps'][0]
+        ]
+    else:
+        param = [
+            '--rc', '0',
+            '-q', job['qp_value'],
+            '--min-qp', job['qp_value'],
+            '--max-qp', (job['qp_value'] + 8)
+        ]
+
     encoder = job['encoder']
     
     if encoder == 'svt-1pass':
 
         codec_params = [
-            '--rc', "2",
-            '-q', QP_VALUE,
             '--preset', "8",
         ]
     elif encoder == 'svt-rt':
@@ -163,17 +187,8 @@ def svt_command(job, temp_dir):
         codec_params = [
             '--scm', 0,
             '--lookahead', 0,
-            '--preset', SVT_SPEED,
+            '--preset', SVT_RT_SPEED,
             '--keyint', (INTRA_IVAL_LOW_LATENCY - 1)
-        ]
-    elif encoder == 'svt-fqp': # Fixed qp
-        
-        codec_params = [
-            '--rc', 0,
-            '--preset', SVT_SPEED,
-            '-q', QP_VALUE,
-            "--min-qp", QP_VALUE,
-            '--max-qp', (QP_VALUE + 8),
         ]
 
     elif encoder == 'svt-all_intra':
@@ -182,12 +197,9 @@ def svt_command(job, temp_dir):
             '--scm', 0,
             '--keyint', 0,
             '--preset', SVT_SPEED,
-            '-q', QP_VALUE,
-            '--min-qp', QP_VALUE,
-            'max-qp', (QP_VALUE + 8)
         ]
     
-    command = [SVT_ENC_BIN] + codec_params + common_params
+    command = [SVT_ENC_BIN] + codec_params + param + common_params
 
     command = [str(flag) for flag in command]
 
@@ -218,7 +230,9 @@ def aom_command(job, temp_dir):
               'sha1sum': str,
               'input_total_frames': float
           },
+          'param': str,
           'target_bitrate_kbps': List[int],
+          'qp_value': int,
           'num_spatial_layers': int,
           'num_temporal_layers': int
       }
@@ -233,7 +247,6 @@ def aom_command(job, temp_dir):
     assert job['num_spatial_layers'] == 1
     assert job['num_temporal_layers'] == 1
     assert job['codec'] == 'av1'
-    # TODO(pbos): Add realtime config (aom-rt) when AV1 is realtime ready.
     assert job['encoder'] in ['aom-good', 'aom-rt', 'aom-all_intra', 'aom-offline']
 
     (fd, first_pass_file) = tempfile.mkstemp(dir=temp_dir, suffix=".fpf")
@@ -250,10 +263,21 @@ def aom_command(job, temp_dir):
         '--width=%d' % clip['width'],
         '--height=%d' % clip['height'],
         '--output=%s' % encoded_filename,
-        '--target-bitrate=%d' % job['target_bitrates_kbps'][0],
-        '--output=%s' % encoded_filename,
+        # '--target-bitrate=%d' % job['target_bitrates_kbps'][0],
         clip['yuv_file']
     ]
+
+    if job['param'] == 'bitrate':
+        param = [
+            '--target-bitrate=%d' % job['target_bitrates_kbps'][0],
+            '--end-usage=cbr'
+        ]
+    else:
+        param = [
+            '--min-q=%d' % job['qp_value'],
+            '--max-q=%d' % (job['qp_value'] + 8),
+            '--end-usage=q'
+        ]
 
     encoder = job['encoder']
 
@@ -263,8 +287,6 @@ def aom_command(job, temp_dir):
             "-p", "2",
             "--lag-in-frames=25",
             '--cpu-used=3',
-            "--min-q=0",
-            "--max-q=63",
             "--auto-alt-ref=1",
             "--kf-max-dist=150",
             "--kf-min-dist=0",
@@ -291,7 +313,8 @@ def aom_command(job, temp_dir):
         ]
     elif encoder == 'aom-rt':
         codec_params = [
-            '--cpu-used=%d' % AOM_SPEED,
+            '--cpu-used=%d' % AOM_RT_SPEED,
+            '--disable-warning-prompt',
             '--enable-tpl-model=0',
             '--deltaq-mode=0',
             '--sb-size=0',
@@ -317,8 +340,6 @@ def aom_command(job, temp_dir):
             '--threads=0',
             "--lag-in-frames=25",
             '--cpu-used=%d' % AOM_SPEED,
-            "--min-q=0",
-            "--max-q=63",
             "--auto-alt-ref=1",
             "--kf-max-dist=150",
             "--kf-min-dist=0",
@@ -337,7 +358,7 @@ def aom_command(job, temp_dir):
             "--profile=0"
         ]
 
-    command = [AOM_ENC_BIN] + codec_params + common_params
+    command = [AOM_ENC_BIN] + codec_params + param + common_params
 
     encoded_files = [{'spatial-layer': 0,
                       'temporal-layer': 0, 'filename': encoded_filename}]
@@ -463,6 +484,7 @@ def openh264_command(job, temp_dir):
               'input_total_frames': float
           },
           'target_bitrate_kbps': List[int],
+          'qp_value': int,
           'num_spatial_layers': int,
           'num_temporal_layers': int
       }
@@ -529,7 +551,9 @@ def yami_command(job, temp_dir):
               'sha1sum': str,
               'input_total_frames': float
           },
+          'param': str,
           'target_bitrate_kbps': List[int],
+          'qp_value': int,
           'num_spatial_layers': int,
           'num_temporal_layers': int
       }

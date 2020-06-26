@@ -106,6 +106,7 @@ parser = argparse.ArgumentParser(description='Generate graph data for video-qual
 parser.add_argument('clips', nargs='+', metavar='clip_WIDTH_HEIGHT.yuv:FPS|clip.y4m', type=clip_arg)
 parser.add_argument('--dump-commands', action='store_true')
 parser.add_argument('--enable-vmaf', action='store_true')
+parser.add_argument('--enable-bitrate', action='store_true')
 parser.add_argument('--enable-framestats', action='store_true')
 parser.add_argument('--encoded-file-dir', default=None, type=writable_dir)
 parser.add_argument('--encoders', required=True, metavar='encoder:codec,encoder:codec...', type=encoder_pairs)
@@ -123,13 +124,20 @@ def generate_jobs(args, temp_dir):
   jobs = []
   for clip in args.clips:
     bitrates = find_bitrates(clip['width'], clip['height'])
-    for bitrate_kbps in bitrates:
+    qp_values = find_qp(clip['width'], clip['height'])
+    if args.enable_bitrate:
+        params = bitrates
+    else:
+        params = qp_values
+    for param in params:
       for (encoder, codec) in args.encoders:
         job = {
+          'param': 'bitrate' if args.enable_bitrate else 'qp',  
           'encoder': encoder,
           'codec': codec,
           'clip': clip,
-          'target_bitrates_kbps': split_temporal_bitrates_kbps(bitrate_kbps, args.num_temporal_layers),
+          'qp_value': param if not args.enable_bitrate else -1,
+          'target_bitrates_kbps': split_temporal_bitrates_kbps(100, args.num_temporal_layers) if args.enable_bitrate else [],
           'num_spatial_layers': args.num_spatial_layers,
           'num_temporal_layers': args.num_temporal_layers,
         }
