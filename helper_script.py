@@ -412,7 +412,7 @@ def prepare_clips(args, temp_dir):
             ['sha1sum', clip['input_file']], encoding='utf-8').split(' ', 1)[0]
         if 'yuv_file' not in clip:
             clip['yuv_file'] = clip['input_file']
-        frame_size = 6 * clip['width'] * clip['height'] / 4
+        frame_size = int(6 * clip['width'] * clip['height'] / 4)
         input_yuv_filesize = os.path.getsize(clip['yuv_file'])
         clip['input_total_frames'] = input_yuv_filesize / frame_size
         # Truncate file if necessary.
@@ -434,7 +434,7 @@ def prepare_clips(args, temp_dir):
         (fd, y4m_file) = tempfile.mkstemp(dir=temp_dir, suffix='.y4m')
         os.close(fd)
 
-        subprocess.check_call(
+        subprocess.check_output(
             ['ffmpeg', '-y', '-s', '%dx%d' % (clip['width'], clip['height']), '-r', str(int(clip['fps'] + 0.5)), '-pix_fmt', 'yuv420p', '-i', clip['yuv_file'], y4m_file]
         )
 
