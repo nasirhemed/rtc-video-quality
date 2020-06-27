@@ -163,9 +163,9 @@ def run_command(job, encoder_command, job_temp_dir, encoded_file_dir):
         generate_metrics(results_dict, job, job_temp_dir, layer)
 
         if encoded_file_dir:
-            # TODO: Figure this out
+            param = job['qp_value'] if job['param'] == 'qp' else job['target_bitrates_kbps'][-1]
             encoded_file_pattern = "%s-%s-%s-%dsl%dtl-%d-sl%d-tl%d%s" % (os.path.splitext(os.path.basename(clip['input_file']))[
-                                                                         0], job['encoder'], job['codec'], job['num_spatial_layers'], job['num_temporal_layers'], job['target_bitrates_kbps'][-1], layer['spatial-layer'], layer['temporal-layer'], os.path.splitext(layer['filename'])[1])
+                                                                         0], job['encoder'], job['codec'], job['num_spatial_layers'], job['num_temporal_layers'], param, layer['spatial-layer'], layer['temporal-layer'], os.path.splitext(layer['filename'])[1])
             shutil.move(layer['filename'], os.path.join(
                 encoded_file_dir, encoded_file_pattern))
         else:
