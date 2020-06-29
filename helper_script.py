@@ -6,6 +6,7 @@ import global_variables
 from binary_vars import *
 import csv
 import shutil
+import json
 
 
 def find_bitrates(width, height):
@@ -337,18 +338,17 @@ def generate_metrics(results_dict, job, temp_dir, encoded_file):
 
     # VMAF option if enabled. TODO: Remove this
     if global_variables.args.enable_vmaf:
-        results_file = 'sample.json'
+        results_file = "%s-%s-%d.json" % (job['encoder'], job['codec'],  job['target_bitrates_kbps'][0])
         vmaf_results = subprocess.check_output(['vmaf/libvmaf/build/tools/vmafossexec', 'yuv420p', str(results_dict['width']), str(
             results_dict['height']), clip['yuv_file'], decoded_file, 'vmaf/model/vmaf_v0.6.1.pkl', '--log-fmt', 'json', '--log', results_file], encoding='utf-8')
         # vmaf_obj = json.loads(vmaf_results)
-        with open('sample.json', 'r') as results_file:
+        with open(results_file, 'r') as results_file: 
             vmaf_obj = json.load(results_file)
-
-        results_dict['vmaf'] = float(vmaf_obj['aggregate']['VMAF_score'])
+        results_dict['vmaf'] = float(vmaf_obj['VMAF score'])
 
         results_dict['frame-vmaf'] = []
         for frame in vmaf_obj['frames']:
-            results_dict['frame-vmaf'].append(frame['VMAF_score'])
+            results_dict['frame-vmaf'].append(frame['metrics']['vmaf'])
 
     layer_fps = clip['fps'] / temporal_divide
     results_dict['layer-fps'] = layer_fps
