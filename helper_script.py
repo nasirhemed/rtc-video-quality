@@ -391,7 +391,9 @@ def generate_metrics(results_dict, job, temp_dir, encoded_file):
         # results_dict['actual-bitrate-bps'] = bitrate_used_bps
         results_dict['bitrate-utilization'] = float(
             bitrate_used_bps) / target_bitrate_bps
-
+    else:
+        results_dict['target-bitrate-bps'] = bitrate_used_bps
+        results_dict['bitrate-config-kbps'] = [bitrate_used_bps // 1000]
 
 
 def prepare_clips(args, temp_dir):
@@ -448,8 +450,11 @@ def prepare_clips(args, temp_dir):
         (fd, y4m_file) = tempfile.mkstemp(dir=temp_dir, suffix='.y4m')
         os.close(fd)
 
-        subprocess.check_output(
-            ['ffmpeg', '-y', '-s', '%dx%d' % (clip['width'], clip['height']), '-r', str(int(clip['fps'] + 0.5)), '-pix_fmt', 'yuv420p', '-i', clip['yuv_file'], y4m_file]
-        )
+        with open(os.devnull, 'w') as devnull:
+            subprocess.check_call(
+                ['ffmpeg', '-y', '-s', '%dx%d' % (clip['width'], clip['height']), '-r', str(int(clip['fps'] + 0.5)), '-pix_fmt', 'yuv420p', '-i', clip['yuv_file'], y4m_file],
+                stdout=devnull,
+                stderr=devnull
+            )
 
         clip['y4m_file'] = y4m_file

@@ -611,7 +611,7 @@ def get_encoder_command(encoder):
     encoders = [
         'aom-good', 'aom-rt', 'aom-all_intra', 'aom-offline', ## AOM CONFIGS
         'rav1e-1pass', 'rav1e-rt', 'rav1e-all_intra', ## RAV1E CONFIGS TODO: FIXME
-        'svt-1pass', 'svt-rt', 'svt-fqp', 'svt-all_intra', ## SVT CONFIGS
+        'svt-1pass', 'svt-rt', 'svt-all_intra', ## SVT CONFIGS
         'openh264', ## OPENH264 CONFIGS
         'libvpx-rt', ## LIBVPX CONFIGS
         'yami' ## YAMI CONFIGS
