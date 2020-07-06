@@ -111,8 +111,8 @@ def run_command(job, encoder_command, job_temp_dir, encoded_file_dir):
     # Metadata about the file
     clip = job['clip']
 
-    # Start timing the encode time
-    start_time = time.time()
+    # Start timing the encode time (cpu time)
+    start_time = time.clock()
     try:
         # Run the encoder process externally
         process = subprocess.Popen(
@@ -123,7 +123,7 @@ def run_command(job, encoder_command, job_temp_dir, encoded_file_dir):
     (output, _) = process.communicate()
 
     # Measure the encoding time
-    actual_encode_ms = (time.time() - start_time) * 1000
+    actual_encode_ms = (time.clock() - start_time) * 1000
 
     # Get file information
     input_yuv_filesize = os.path.getsize(clip['yuv_file'])
