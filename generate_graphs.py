@@ -71,24 +71,36 @@ def generate_stt(data, output_dir=''):
           'glb-psnr-u',
           'glb-psnr-v',
           'encode-time-utilization',
-          'actual-encode-time',
+          'actual-encode-time-ms',
           'vmaf'
         ]
   encoder_codecs = set([(item['encoder'], item['codec']) for item in data])
   videos = set([item['input-file'] for item in data])
-
-  bitrates = sorted(list(set([item['bitrate-config-kbps'][0] for item in data])))
+  
+## For target bitrate
 
 
   for encoder, codec in encoder_codecs:
       ## Create a directory for every encoder-codec tool
-    Path(f"./{output_dir}/{codec} {encoder}").mkdir(parents=True, exist_ok=True)
+    Path(f"./{output_dir}/{encoder}:{codec}").mkdir(parents=True, exist_ok=True)
     for video in videos:
         ## Create a file for the metrics of this certain video
       sb = ""
+
+      encoder_metrics = list(filter(lambda item: item['encoder'] == encoder and item['codec'] == codec and item['input-file'] == video, data))
+
+      ##  For Target bitrate
+      #   bitrates = sorted(list(set([[item['actual-bitrate-bps'] // 1000 ][0] for item in encoder_metrics])))
+
+      bitrates = sorted(list(set([item['actual-bitrate-bps'] for item in encoder_metrics])))
       for bitrate in bitrates:
         ## Append this to the table
-        filtered_item = list(filter(lambda item: item['encoder'] == encoder and item['codec'] == codec and item['input-file'] == video and bitrate in item['bitrate-config-kbps'], data))
+
+        ## For target bitrate
+        # filtered_item = list(filter(lambda item: item['encoder'] == encoder and item['codec'] == codec and item['input-file'] == video and bitrate in [item['actual-bitrate-bps'] // 1000 ], data))
+        
+        
+        filtered_item = list(filter(lambda item: item['encoder'] == encoder and item['codec'] == codec and item['input-file'] == video and bitrate == item['actual-bitrate-bps'], data))
         assert len(filtered_item ) == 1
         item = filtered_item[0]
 
@@ -98,17 +110,15 @@ def generate_stt(data, output_dir=''):
         for key in metrics:
           if key in item:
             required_data[key] = "{:.2f}".format(item[key])
-        # required_data = { key : "{:.2f}".format(item[key]) for key in metrics if key in item}
-        # required_data['bitrate'] = str(bitrate)
 
         header = '\t'.join(required_data.keys()) + '\n'
         values = '\t'.join(required_data.values()) + '\n'
 
         sb += header + values
-      with open(f'./{output_dir}/{codec} {encoder}/{video}.stt', 'w') as file:
+      with open(f'./{output_dir}/{encoder}:{codec}/{video}.stt', 'w') as file:
         file.write(sb)
 
-  enc_cod_dirs = [f"./{output_dir}/{codec} {encoder}" for encoder, codec in encoder_codecs]
+  enc_cod_dirs = [f"./{output_dir}/{encoder}:{codec}" for encoder, codec in encoder_codecs]
   html = HandleFiles(['', 'metrics_template.html', '*stt'] + enc_cod_dirs)
 
   with open(f"{output_dir}/results.html", "w") as file:
@@ -124,7 +134,7 @@ def generate_graphs(output_dict, graph_data, target_metric, bitrate_config_strin
         for data in layer:
           if target_metric not in data:
             return
-          metric_data.append((data['target-bitrate-bps']/1000, data[target_metric], data['bitrate-utilization']))
+          metric_data.append((data['actual-bitrate-bps']/1000, data[target_metric], 1))
         line_name = '%s:%s (tl%d)' % (layer[0]['encoder'], layer[0]['codec'], layer[0]['temporal-layer'])
         # Sort points on target bitrate.
         lines[line_name] = sorted(metric_data, key=lambda point: point[0])
@@ -139,6 +149,8 @@ def main():
     graph_data += ast.literal_eval(f.read())
 
   generate_stt(graph_data, args.out_dir)
+  
+  return
 
   graph_dict = {}
   for input_files in split_data(graph_data, 'input-file'):
@@ -163,7 +175,7 @@ def main():
           'vmaf'
         ]
         for metric in metrics:
-          generate_graphs(graph_dict, layer_pattern, metric, normalize_bitrate_config_string(data['bitrate-config-kbps']))
+          generate_graphs(graph_dict, layer_pattern, metric, normalize_bitrate_config_string([data['actual-bitrate-bps'] // 1000 ]))
 
   for point in graph_data:
     pattern_match = layer_regex_pattern.match(point['layer-pattern'])
@@ -189,10 +201,11 @@ def main():
       split_on_codecs = target_metric == 'frame-qp'
 
       if split_on_codecs:
-        graph_name = "%s-%s-%s-%dkbps-tl%d-%s:%s" % (point['input-file'], point['layer-pattern'], normalize_bitrate_config_string(point['bitrate-config-kbps']), point['bitrate-config-kbps'][-1], point['temporal-layer'], point['codec'], target_metric)
+        graph_name = "%s-%s-%s-%dkbps-tl%d-%s:%s" % (point['input-file'], point['layer-pattern'], normalize_bitrate_config_string([point['actual-bitrate-bps'] // 1000 ]), [point['actual-bitrate-bps'] // 1000 ][-1], point['temporal-layer'], point['codec'], target_metric)
         line_name = '%s' % point['encoder']
       else:
-        graph_name = "%s-%s-%s-%dkbps-tl%d:%s" % (point['input-file'], point['layer-pattern'], normalize_bitrate_config_string(point['bitrate-config-kbps']), point['bitrate-config-kbps'][-1], point['temporal-layer'], target_metric)
+        graph_name = "%s-%s-%s-%dkbps-tl%d:%s" % (point['input-file'], point['layer-pattern'], normalize_bitrate_config_string([point['actual-bitrate-bps'] // 1000 ]), [point['actual-bitrate-bps'] // 1000 ][-1], point['temporal-layer'], target_metric)
+        graph_name = "%s-%s-%s-%dkbps-tl%d:%s" % (point['input-file'], point['layer-pattern'], normalize_bitrate_config_string([point['actual-bitrate-bps'] // 1000 ]), [point['actual-bitrate-bps'] // 1000 ][-1], point['temporal-layer'], target_metric)
         line_name = '%s:%s' % (point['encoder'], point['codec'])
       graph_info = ('frame-data-%s/' % point['input-file'], graph_name)
       if not graph_info in graph_dict:

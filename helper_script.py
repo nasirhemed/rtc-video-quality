@@ -1,3 +1,17 @@
+# Copyright 2020 Google LLC
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     https://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import os
 import subprocess
 import tempfile
@@ -32,6 +46,10 @@ def find_bitrates(width, height):
     if pixel_bound <= 1920 * 1080:
         return [800, 1200, 2000, 3000, 5000, 10000]
     return [1200, 1800, 3000, 6000, 10000, 15000]
+
+
+def find_qp(width, height):
+    return [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
 
 
 def split_temporal_bitrates_kbps(target_bitrate_kbps, num_temporal_layers):
@@ -98,7 +116,7 @@ def run_command(job, encoder_command, job_temp_dir, encoded_file_dir):
     try:
         # Run the encoder process externally
         process = subprocess.Popen(
-            command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding='utf-8')
     except OSError as e:
         return (None, "> %s\n%s" % (" ".join(command), e))
     # Wait for external process to finish
@@ -146,9 +164,9 @@ def run_command(job, encoder_command, job_temp_dir, encoded_file_dir):
         generate_metrics(results_dict, job, job_temp_dir, layer)
 
         if encoded_file_dir:
-            # TODO: Figure this out
+            param = job['qp_value'] if job['param'] == 'qp' else job['target_bitrates_kbps'][-1]
             encoded_file_pattern = "%s-%s-%s-%dsl%dtl-%d-sl%d-tl%d%s" % (os.path.splitext(os.path.basename(clip['input_file']))[
-                                                                         0], job['encoder'], job['codec'], job['num_spatial_layers'], job['num_temporal_layers'], job['target_bitrates_kbps'][-1], layer['spatial-layer'], layer['temporal-layer'], os.path.splitext(layer['filename'])[1])
+                                                                         0], job['encoder'], job['codec'], job['num_spatial_layers'], job['num_temporal_layers'], param, layer['spatial-layer'], layer['temporal-layer'], os.path.splitext(layer['filename'])[1])
             shutil.move(layer['filename'], os.path.join(
                 encoded_file_dir, encoded_file_pattern))
         else:
@@ -337,8 +355,10 @@ def generate_metrics(results_dict, job, temp_dir, encoded_file):
         add_framestats(results_dict, metrics_framestats, float)
 
     # VMAF option if enabled. TODO: Remove this
+
     if global_variables.args.enable_vmaf:
-        results_file = "%s-%s-%d.json" % (job['encoder'], job['codec'],  job['target_bitrates_kbps'][0])
+        (fd,results_file) = tempfile.mkstemp(dir=temp_dir, suffix="%s-%s-%d.json" % (job['encoder'], job['codec'],  job['qp_value']))
+        os.close(fd)
         vmaf_results = subprocess.check_output(['vmaf/libvmaf/build/tools/vmafossexec', 'yuv420p', str(results_dict['width']), str(
             results_dict['height']), clip['yuv_file'], decoded_file, 'vmaf/model/vmaf_v0.6.1.pkl', '--log-fmt', 'json', '--log', results_file], encoding='utf-8')
         # vmaf_obj = json.loads(vmaf_results)
@@ -359,13 +379,23 @@ def generate_metrics(results_dict, job, temp_dir, encoded_file):
     results_dict['layer-height'] = results_dict['height'] // spatial_divide
 
     # Calculate and compare target bitrate with actual bitrate used
-    target_bitrate_bps = job['target_bitrates_kbps'][encoded_file['temporal-layer']] * 1000
+    # target_bitrate_bps = job['target_bitrates_kbps'][encoded_file['temporal-layer']] * 1000
     bitrate_used_bps = os.path.getsize(
         encoded_file['filename']) * 8 * layer_fps / layer_frames
-    results_dict['target-bitrate-bps'] = target_bitrate_bps
+    # results_dict['target-bitrate-bps'] = target_bitrate_bps
     results_dict['actual-bitrate-bps'] = bitrate_used_bps
-    results_dict['bitrate-utilization'] = float(
-        bitrate_used_bps) / target_bitrate_bps
+    # results_dict['bitrate-utilization'] = float(
+    #     bitrate_used_bps) / target_bitrate_bps
+    
+    if global_variables.args.enable_bitrate:
+        target_bitrate_bps = job['target_bitrates_kbps'][encoded_file['temporal-layer']] * 1000
+        results_dict['target-bitrate-bps'] = target_bitrate_bps
+        # results_dict['actual-bitrate-bps'] = bitrate_used_bps
+        results_dict['bitrate-utilization'] = float(
+            bitrate_used_bps) / target_bitrate_bps
+    else:
+        results_dict['target-bitrate-bps'] = bitrate_used_bps
+        results_dict['bitrate-config-kbps'] = [bitrate_used_bps // 1000]
 
 
 def prepare_clips(args, temp_dir):
@@ -379,14 +409,13 @@ def prepare_clips(args, temp_dir):
     * Store the total number of frames and the size of the file
     """
     clips = args.clips
-    # TODO: do not convert y4m if cargo encoder is being used
-    y4m_clips = [clip for clip in clips if clip['file_type'] == 'y4m']
+    non_yuv_clips = [clip for clip in clips if clip['file_type'] != '.yuv']
 
-    # Convert all y4m clips to yuv using ffmpeg
-    if y4m_clips:
-        print("Converting %d .y4m clip%s..." %
-              (len(y4m_clips), "" if len(y4m_clips) == 1 else "s"))
-        for clip in y4m_clips:
+    # Convert all non yuv clips to yuv using ffmpeg
+    if non_yuv_clips:
+        print("Converting %d clip%s to yuv..." %
+              (len(non_yuv_clips), "" if len(non_yuv_clips) == 1 else "s"))
+        for clip in non_yuv_clips:
             (fd, yuv_file) = tempfile.mkstemp(dir=temp_dir,
                                               suffix=".%d_%d.yuv" % (clip['width'], clip['height']))
             os.close(fd)
@@ -401,7 +430,7 @@ def prepare_clips(args, temp_dir):
             ['sha1sum', clip['input_file']], encoding='utf-8').split(' ', 1)[0]
         if 'yuv_file' not in clip:
             clip['yuv_file'] = clip['input_file']
-        frame_size = 6 * clip['width'] * clip['height'] / 4
+        frame_size = int(6 * clip['width'] * clip['height'] / 4)
         input_yuv_filesize = os.path.getsize(clip['yuv_file'])
         clip['input_total_frames'] = input_yuv_filesize / frame_size
         # Truncate file if necessary.
@@ -419,3 +448,15 @@ def prepare_clips(args, temp_dir):
                         truncated_file.write(data)
                         total_filesize -= blocksize
             clip['yuv_file'] = truncated_filename
+
+        (fd, y4m_file) = tempfile.mkstemp(dir=temp_dir, suffix='.y4m')
+        os.close(fd)
+
+        with open(os.devnull, 'w') as devnull:
+            subprocess.check_call(
+                ['ffmpeg', '-y', '-s', '%dx%d' % (clip['width'], clip['height']), '-r', str(int(clip['fps'] + 0.5)), '-pix_fmt', 'yuv420p', '-i', clip['yuv_file'], y4m_file],
+                stdout=devnull,
+                stderr=devnull
+            )
+
+        clip['y4m_file'] = y4m_file
