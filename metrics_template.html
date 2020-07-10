@@ -163,7 +163,26 @@ var filestable_avg = [];
 //%%filestable_drate%%//
 //%%snrs%%//
 
-var selected = 0
+var metricToUnit = {
+  "bitrate": "Datarate (kbps)", 
+  "vpx_ssim": "SSIM Quality (-1,1)",
+  "ssim":   "SSIM Quality (-1,1)",
+  "ssim-y": "SSIM Quality (-1,1)",
+  "ssim-u": "SSIM Quality (-1,1)",
+  "ssim-v": "SSIM Quality (-1,1)",
+  "avg-psnr":   "PSNR Quality in decibels",
+  "avg-psnr-y": "PSNR Quality in decibels",
+  "avg-psnr-u": "PSNR Quality in decibels",
+  "avg-psnr-v": "PSNR Quality in decibels",
+  "glb-psnr":   "PSNR Quality in decibels",
+  "glb-psnr-y": "PSNR Quality in decibels",
+  "glb-psnr-u": "PSNR Quality in decibels",
+  "glb-psnr-v": "PSNR Quality in decibels",
+  "encode-time-utilization": "Time (ms)",
+  "actual-encode-time-ms": "Time (ms)",
+  "vmaf": "VMAF"
+};
+var selected = 0;
 var imagestr = '';
 var bettertable=0;
 var chart=0;
@@ -238,13 +257,12 @@ function query_file() {
   metricdata = new google.visualization.DataTable(metricjson, 0.6);
   if( metricView != 0 ) delete metricView;
   metricView = new google.visualization.DataView(metricdata);
-
   chart.draw(metricView, {curveType:'function',
       explorer: {},
       chartArea:{left:chart_left, top:chart_top, width:chart_width,
       height:chart_height-90},
       hAxis:{title:"Datarate in kbps"},
-      vAxis:{title:"Quality in decibels", format: '##.0', textPosition: 'in'},
+      vAxis:{title:metrc=metricToUnit[metrics[column]], format: '##.0', textPosition: 'in'},
       legend:{position:"in"}, title:imagestr, pointSize:2, lineWidth:1,
       width:chart_width, height:chart_height-50 });
 
