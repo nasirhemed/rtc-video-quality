@@ -21,6 +21,7 @@ from binary_vars import *
 import csv
 import shutil
 import json
+import math
 
 
 def find_bitrates(width, height):
@@ -110,7 +111,7 @@ def run_command(job, encoder_command, job_temp_dir, encoded_file_dir):
     clip = job['clip']
 
     # Start timing the encode time (cpu time)
-    start_time = time.clock()
+    start_time = time.process_time()
     try:
         # Run the encoder process externally
         process = subprocess.Popen(
@@ -121,7 +122,7 @@ def run_command(job, encoder_command, job_temp_dir, encoded_file_dir):
     (output, _) = process.communicate()
 
     # Measure the encoding time
-    actual_encode_ms = (time.clock() - start_time) * 1000
+    actual_encode_ms = (time.process_time() - start_time) * 1000
 
     # Get file information
     input_yuv_filesize = os.path.getsize(clip['yuv_file'])
@@ -247,6 +248,14 @@ def add_framestats(results_dict, framestats_file, statstype):
                     results_dict[metric_key] = []
                 results_dict[metric_key].append(statstype(value))
 
+def psnr_to_dmos(score):
+    # DMOS = 1 - 1 / (1 + math.pow(math.e,(-0.1657) * (score + (-26.19))))
+    params = [-0.1657, -26.19]
+    v = 1 - 1.0 / (1 + math.pow(math.e,(params[0] * (score + params[1]))))
+    return max(0.0, min(1.0, v))
+
+
+
 
 def decode_file(job, temp_dir, encoded_file):
     """
@@ -346,7 +355,7 @@ def generate_metrics(results_dict, job, temp_dir, encoded_file):
         elif metric == 'Nframes':
             layer_frames = int(value)
             results_dict['frame-count'] = layer_frames
-
+    results_dict["psnr-dmos"] = psnr_to_dmos(results_dict['avg-psnr'])
     if global_variables.args.enable_framestats:
         if decoder_framestats:
             add_framestats(results_dict, decoder_framestats, int)
