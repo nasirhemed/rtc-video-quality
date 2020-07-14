@@ -22,7 +22,7 @@ import csv
 import shutil
 import json
 import math
-
+import shlex
 
 def find_bitrates(width, height):
     # Do multiples of 100, because grouping based on bitrate splits in
@@ -114,8 +114,7 @@ def run_command(job, encoder_command, job_temp_dir, encoded_file_dir):
     start_time = time.process_time()
     try:
         # Run the encoder process externally
-        process = subprocess.Popen(
-            command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding='utf-8')
+        process = subprocess.Popen(' '.join(shlex.quote(arg) if arg != '&&' else arg for arg in command), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, encoding='utf-8', shell=True)
     except OSError as e:
         return (None, "> %s\n%s" % (" ".join(command), e))
     # Wait for external process to finish

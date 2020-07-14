@@ -144,7 +144,11 @@ def generate_jobs(args, temp_dir):
         job_temp_dir = tempfile.mkdtemp(dir=temp_dir)
         encoder_command_function = get_encoder_command(job['encoder'])
         (command, encoded_files) = encoder_command_function(job, job_temp_dir)
-        command[0] = find_absolute_path(args.use_system_path, command[0])
+        full_command = find_absolute_path(args.use_system_path, command[0])
+        command = [
+            full_command if word == command[0] else word
+            for word in command
+        ]
         jobs.append((job, (command, encoded_files), job_temp_dir))
   return jobs
 
