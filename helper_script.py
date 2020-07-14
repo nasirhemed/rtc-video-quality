@@ -254,9 +254,6 @@ def psnr_to_dmos(score):
     v = 1 - 1.0 / (1 + math.pow(math.e,(params[0] * (score + params[1]))))
     return max(0.0, min(1.0, v))
 
-
-
-
 def decode_file(job, temp_dir, encoded_file):
     """
     Decode the encoded file and store it in a temporary directory
