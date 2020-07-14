@@ -160,7 +160,7 @@ def svt_command(job, temp_dir):
     assert job['num_spatial_layers'] == 1
     assert job['num_temporal_layers'] == 1
     assert job['codec'] == 'av1'
-    assert job['encoder'] in ['svt-1pass', 'svt-rt', 'svt-all_intra']
+    assert job['encoder'] in ['svt-1pass', 'svt-rt', 'svt-offline', 'svt-all_intra']
 
     (fd, encoded_filename) = tempfile.mkstemp(dir=temp_dir, suffix=".ivf")
     os.close(fd)
@@ -211,10 +211,42 @@ def svt_command(job, temp_dir):
             '--keyint', 0,
             '--preset', SVT_SPEED,
         ]
-    
-    command = [SVT_ENC_BIN] + codec_params + param + common_params
+    elif encoder == 'svt-offline':
+
+        (fd, statfile) = tempfile.mkstemp(dir=temp_dir, suffix='.stat')
+        os.close(fd)
+
+        first_pass_params = [
+            '--scm', 0,
+            '--keyint', (INTRA_IVAL_LOW_LATENCY -1),
+            '--preset', 8,
+            '--output-stat-file', statfile
+        ]
+
+        second_pass_params = [
+            '--scm', 0,
+            '--keyint', (INTRA_IVAL_LOW_LATENCY - 1),
+            '--preset', SVT_SPEED,
+            '--tile-columns', 3,
+            '--enable-altrefs', 1,
+            '--altref-nframes', 7,
+            '--altref-strength', 5,
+            '--input-stat-file', statfile
+        ]
+
+    if 'offline' in encoder:
+        first_pass_command = [ SVT_ENC_BIN ] + first_pass_params + param + common_params
+        second_pass_command = [ SVT_ENC_BIN ] + second_pass_params + param + common_params
+
+        command = first_pass_command + ['&&'] + second_pass_command
+
+    else:
+
+        command = [SVT_ENC_BIN] + codec_params + param + common_params
 
     command = [str(flag) for flag in command]
+
+    
 
     encoded_files = [{'spatial-layer': 0,
                       'temporal-layer': 0, 'filename': encoded_filename
@@ -611,7 +643,7 @@ def get_encoder_command(encoder):
     encoders = [
         'aom-good', 'aom-rt', 'aom-all_intra', 'aom-offline', ## AOM CONFIGS
         'rav1e-1pass', 'rav1e-rt', 'rav1e-all_intra', ## RAV1E CONFIGS TODO: FIXME
-        'svt-1pass', 'svt-rt', 'svt-all_intra', ## SVT CONFIGS
+        'svt-1pass', 'svt-rt', 'svt-all_intra', 'svt-offline', ## SVT CONFIGS
         'openh264', ## OPENH264 CONFIGS
         'libvpx-rt', ## LIBVPX CONFIGS
         'yami' ## YAMI CONFIGS
