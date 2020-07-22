@@ -164,7 +164,7 @@ var filestable_avg = [];
 //%%snrs%%//
 
 var metricToUnit = {
-  "bitrate": "Datarate (kbps)", 
+  "bitrate": "Datarate (bps)", 
   "vpx_ssim": "SSIM Quality (-1,1)",
   "ssim":   "SSIM Quality (-1,1)",
   "ssim-y": "SSIM Quality (-1,1)",
@@ -262,7 +262,7 @@ function query_file() {
       explorer: {},
       chartArea:{left:chart_left, top:chart_top, width:chart_width,
       height:chart_height-90},
-      hAxis:{title:"Datarate in kbps"},
+      hAxis:{title:"Datarate in bps"},
       vAxis:{title:metrc=metricToUnit[metrics[column]], format: '##.0', textPosition: 'in'},
       legend:{position:"in"}, title:imagestr, pointSize:2, lineWidth:1,
       width:chart_width, height:chart_height-50 });
@@ -370,7 +370,7 @@ function chartSelect() {
 
   chart.draw(metricView, {curveType:'function',
       chartArea:{left:40, top:10, width:chart_width, height:chart_height - 110},
-      hAxis:{title:"datarate in kbps"}, vAxis:{title:"quality in decibels"},
+      hAxis:{title:"datarate in bps"}, vAxis:{title:"quality in decibels"},
       legend:{position:"in"}, title:imagestr, pointSize:2, lineWidth:1,
       width:chart_width, height:chart_height - 50});
 }

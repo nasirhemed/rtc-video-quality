@@ -67,11 +67,14 @@ def rav1e_command(job, temp_dir):
     assert job['num_spatial_layers'] == 1
     assert job['num_temporal_layers'] == 1
     assert job['codec'] == 'av1'
-    assert job['encoder'] in ['rav1e-1pass', 'rav1e-rt', 'rav1e-all_intra']
+    assert job['encoder'] in ['rav1e-1pass', 'rav1e-rt', 'rav1e-all_intra', 'rav1e-offline']
 
     (fd, encoded_filename) = tempfile.mkstemp(dir=temp_dir, suffix=".ivf")
     os.close(fd)
 
+    (fd, statfile) = tempfile.mkstemp(dir=temp_dir, suffix='.stat')
+    os.close(fd)
+    
     clip = job['clip']
     fps = int(clip['fps'] + 0.5)
 
@@ -110,8 +113,27 @@ def rav1e_command(job, temp_dir):
             '--speed', '4',
             '--keyint', '1'
         ]
-
-    command = [RAV1E_ENC_BIN] + codec_params + param + common_params
+    if encoder == 'rav1e-offline':
+        pass1_params = [
+            '--low-latency',
+            '--speed', 8,
+            '--first-pass', statfile
+        ]
+ 
+        pass2_params = [
+            '--second-pass', statfile,
+            '--keyint', INTRA_IVAL_LOW_LATENCY,
+            '--speed', RAV1E_SPEED
+        ]
+ 
+    if 'offline' in encoder:
+        first_pass_command = [RAV1E_ENC_BIN] + pass1_params + param + common_params
+        second_pass_command = [RAV1E_ENC_BIN] + pass2_params + param + common_params
+ 
+        command = first_pass_command  + ['&&'] +  second_pass_command
+        command = [str(flag) for flag in command]
+    else:
+        command = [RAV1E_ENC_BIN] + codec_params + param + common_params
 
     command = [str(flag) for flag in command]
 
@@ -642,7 +664,7 @@ def yami_command(job, temp_dir):
 def get_encoder_command(encoder):
     encoders = [
         'aom-good', 'aom-rt', 'aom-all_intra', 'aom-offline', ## AOM CONFIGS
-        'rav1e-1pass', 'rav1e-rt', 'rav1e-all_intra', ## RAV1E CONFIGS TODO: FIXME
+        'rav1e-1pass', 'rav1e-rt', 'rav1e-all_intra', 'rav1e-offline', ## RAV1E CONFIGS TODO: FIXME
         'svt-1pass', 'svt-rt', 'svt-all_intra', 'svt-offline', ## SVT CONFIGS
         'openh264', ## OPENH264 CONFIGS
         'libvpx-rt', ## LIBVPX CONFIGS
